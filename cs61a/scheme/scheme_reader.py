@@ -159,8 +159,7 @@ def read_tail(src):
             src.pop_first()
             return nil
         else:
-            
-        
+            return Pair(scheme_read(src), read_tail(src))
     except EOFError:
         raise SyntaxError('unexpected end of file')
 

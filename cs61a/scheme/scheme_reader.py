@@ -1,16 +1,13 @@
 """This module implements the built-in data types of the Scheme language, along
 with a parser for Scheme expressions.
-
 In addition to the types defined in this file, some data types in Scheme are
 represented by their corresponding type in Python:
     number:       int or float
     symbol:       string
     boolean:      bool
     unspecified:  None
-
 The __repr__ method of a Scheme value will return a Python expression that
 would be evaluated to the value, where possible.
-
 The __str__ method of a Scheme value will return a Scheme expression that
 would be read to the value, where possible.
 """
@@ -28,7 +25,6 @@ from buffer import Buffer, InputReader, LineReader
 
 class Pair(object):
     """A pair has two instance attributes: first and rest. rest must be a Pair or nil
-
     >>> s = Pair(1, Pair(2, nil))
     >>> s
     Pair(1, Pair(2, nil))
@@ -119,7 +115,6 @@ quotes = {"'":  'quote',
 
 def scheme_read(src):
     """Read the next expression from SRC, a Buffer of tokens.
-
     >>> scheme_read(Buffer(tokenize_lines(['nil'])))
     nil
     >>> scheme_read(Buffer(tokenize_lines(['1'])))
@@ -137,16 +132,13 @@ def scheme_read(src):
     elif val == '(':
         return read_tail(src)
     elif val in quotes:
-        # BEGIN PROBLEM 6
-        "*** YOUR CODE HERE ***"
-        # END PROBLEM 6
+        return Pair(quotes[val], Pair(scheme_read(src), nil))
     elif val not in DELIMITERS:
         return val
     else:
         raise SyntaxError('unexpected token: {0}'.format(val))
 def read_tail(src):
     """Return the remainder of a list in SRC, starting before an element or ).
-
     >>> read_tail(Buffer(tokenize_lines([')'])))
     nil
     >>> read_tail(Buffer(tokenize_lines(['2 3)'])))

@@ -14,7 +14,6 @@ from ucb import main, trace
 
 def scheme_eval(expr, env, _=None): # Optional third argument is ignored
     """Evaluate Scheme expression EXPR in environment ENV.
-
     >>> expr = read_line('(+ 2 2)')
     >>> expr
     Pair('+', Pair(2, Pair(2, nil)))
@@ -56,7 +55,6 @@ def scheme_apply(procedure, args, env):
 def eval_all(expressions, env):
     """Evaluate each expression in the Scheme list EXPRESSIONS in
     environment ENV and return the value of the last.
-
     >>> eval_all(read_line("(1)"), create_global_frame())
     1
     >>> eval_all(read_line("(1 2)"), create_global_frame())
@@ -68,9 +66,13 @@ def eval_all(expressions, env):
     >>> eval_all(read_line("((define x 2) x)"), create_global_frame())
     2
     """
-    # BEGIN PROBLEM 7
-    return scheme_eval(expressions.first, env) # change this line
-    # END PROBLEM 7
+    if expressions is nil:
+        return None
+    elif expressions.rest is nil:
+        return scheme_eval(expressions.first, env)
+    else:
+        scheme_eval(expressions.first, env)
+        return eval_all(expressions.rest, env)
 
 ################
 # Environments #
@@ -110,15 +112,22 @@ class Frame(object):
         in a Scheme list of formal parameters FORMALS are bound to the Scheme
         values in the Scheme list VALS. Raise an error if too many or too few
         vals are given.
-
         >>> env = create_global_frame()
         >>> formals, expressions = read_line('(a b c)'), read_line('(1 2 3)')
         >>> env.make_child_frame(formals, expressions)
         <{a: 1, b: 2, c: 3} -> <Global Frame>>
         """
-        # BEGIN PROBLEM 10
-        "*** YOUR CODE HERE ***"
-        # END PROBLEM 10
+        child_frame = Frame(self)
+        while True:
+            if vals is nil and formals is nil:
+                break
+            elif vals is nil or formals is nil:
+                raise SchemeError
+            else:
+                child_frame.define(formals.first, vals.first)
+                formals = formals.rest
+                vals = vals.rest
+        return child_frame
 
 ##############
 # Procedures #
@@ -143,7 +152,6 @@ class BuiltinProcedure(Procedure):
 
     def apply(self, args, env):
         """Apply SELF to ARGS in ENV, where ARGS is a Scheme list (a Pair instance).
-
         >>> env = create_global_frame()
         >>> plus = env.bindings['+']
         >>> twos = Pair(2, Pair(2, nil))
@@ -193,9 +201,9 @@ class LambdaProcedure(Procedure):
     def make_call_frame(self, args, env):
         """Make a frame that binds my formal parameters to ARGS, a Scheme list
         of values, for a lexically-scoped call evaluated in my parent environment."""
-        # BEGIN PROBLEM 11
-        "*** YOUR CODE HERE ***"
-        # END PROBLEM 11
+        #so env is the env in which it is called and self is the one in which it is
+        #defined, the new env has to be the child of self.  Cool
+        return self.env.make_child_frame(self.formals, args)
 
     def __str__(self):
         return str(Pair('lambda', Pair(self.formals, self.body)))
@@ -230,7 +238,6 @@ def add_builtins(frame, funcs_and_names):
 
 def do_define_form(expressions, env):
     """Evaluate a define form.
-
     >>> # Problem 5
     >>> env = create_global_frame()
     >>> do_define_form(read_line("(x 2)"), env)
@@ -252,31 +259,30 @@ def do_define_form(expressions, env):
     target = expressions.first
     if scheme_symbolp(target):
         validate_form(expressions, 2, 2) # Checks that expressions is a list of length exactly 2
-        val = expressions.rest.first
-        if isinstance(val, Pair):
-            val = scheme_eval(val, env)
-        env.define(expressions.first, val)
-        return expressions.first
+        val = scheme_eval(expressions.rest.first,env)
+        env.define(target, val)
+        return target
     elif isinstance(target, Pair) and scheme_symbolp(target.first):
-        # BEGIN PROBLEM 9
-        "*** YOUR CODE HERE ***"
-        # END PROBLEM 9
+        name = target.first
+        formals = target.rest
+        body = expressions.rest
+        validate_formals(formals)
+        env.define(name, LambdaProcedure(formals, body, env))
+        return name
     else:
         bad_target = target.first if isinstance(target, Pair) else target
         raise SchemeError('non-symbol: {0}'.format(bad_target))
 
 def do_quote_form(expressions, env):
     """Evaluate a quote form.
-
     >>> env = create_global_frame()
     >>> do_quote_form(read_line("((+ x 2))"), env)
     Pair('+', Pair('x', Pair(2, nil)))
     """
     validate_form(expressions, 1, 1)
-    return expressions
+    return expressions.first
 def do_begin_form(expressions, env):
     """Evaluate a begin form.
-
     >>> env = create_global_frame()
     >>> x = do_begin_form(read_line("((print 2) 3)"), env)
     2
@@ -288,7 +294,6 @@ def do_begin_form(expressions, env):
 
 def do_lambda_form(expressions, env):
     """Evaluate a lambda form.
-
     >>> env = create_global_frame()
     >>> do_lambda_form(read_line("((x) (+ x 2))"), env)
     LambdaProcedure(Pair('x', nil), Pair(Pair('+', Pair('x', Pair(2, nil))), nil), <Global Frame>)
@@ -296,13 +301,10 @@ def do_lambda_form(expressions, env):
     validate_form(expressions, 2)
     formals = expressions.first
     validate_formals(formals)
-    # BEGIN PROBLEM 8
-    "*** YOUR CODE HERE ***"
-    # END PROBLEM 8
-
+    return LambdaProcedure(formals,expressions.rest, env)
+    
 def do_if_form(expressions, env):
     """Evaluate an if form.
-
     >>> env = create_global_frame()
     >>> do_if_form(read_line("(#t (print 2) (print 3))"), env)
     2
@@ -317,7 +319,6 @@ def do_if_form(expressions, env):
 
 def do_and_form(expressions, env):
     """Evaluate a (short-circuited) and form.
-
     >>> env = create_global_frame()
     >>> do_and_form(read_line("(#f (print 1))"), env)
     False
@@ -328,13 +329,16 @@ def do_and_form(expressions, env):
     4
     False
     """
-    # BEGIN PROBLEM 12
-    "*** YOUR CODE HERE ***"
-    # END PROBLEM 12
+    result = True
+    while expressions is not nil:
+        result = scheme_eval(expressions.first,env)
+        expressions = expressions.rest
+        if is_false_primitive(result):
+            return False
+    return result
 
 def do_or_form(expressions, env):
     """Evaluate a (short-circuited) or form.
-
     >>> env = create_global_frame()
     >>> do_or_form(read_line("(10 (print 1))"), env)
     10
@@ -345,13 +349,17 @@ def do_or_form(expressions, env):
     2
     6
     """
-    # BEGIN PROBLEM 12
-    "*** YOUR CODE HERE ***"
-    # END PROBLEM 12
+    
+    result = False
+    while expressions is not nil:
+        result = scheme_eval(expressions.first,env)
+        expressions = expressions.rest
+        if is_true_primitive(result):
+            return result
+    return result
 
 def do_cond_form(expressions, env):
     """Evaluate a cond form.
-
     >>> do_cond_form(read_line("((#f (print 2)) (#t 3))"), create_global_frame())
     3
     """
@@ -365,14 +373,14 @@ def do_cond_form(expressions, env):
         else:
             test = scheme_eval(clause.first, env)
         if is_true_primitive(test):
-            # BEGIN PROBLEM 13
-            "*** YOUR CODE HERE ***"
-            # END PROBLEM 13
+            if clause.rest is nil:
+                return test
+            else:
+                return eval_all(clause.rest, env)
         expressions = expressions.rest
 
 def do_let_form(expressions, env):
     """Evaluate a let form.
-
     >>> env = create_global_frame()
     >>> do_let_form(read_line("(((x 2) (y 3)) (+ x y))"), env)
     5
@@ -389,15 +397,18 @@ def make_let_frame(bindings, env):
     if not scheme_listp(bindings):
         raise SchemeError('bad bindings list in let form')
     names, values = nil, nil
-    # BEGIN PROBLEM 14
-    "*** YOUR CODE HERE ***"
-    # END PROBLEM 14
+    while bindings is not nil:
+        validate_form(bindings.first, 2, 2)
+        val = scheme_eval(bindings.first.rest.first, env)
+        names = Pair(bindings.first.first, names)
+        validate_formals(names)
+        values = Pair(val, values)
+        bindings = bindings.rest
     return env.make_child_frame(names, values)
 
 
 def do_define_macro(expressions, env):
     """Evaluate a define-macro form.
-
     >>> env = create_global_frame()
     >>> do_define_macro(read_line("((f x) (car x))"), env)
     'f'
@@ -456,7 +467,6 @@ def validate_form(expr, min, max=float('inf')):
     """Check EXPR is a proper list whose length is at least MIN and no more
     than MAX (default: no maximum). Raises a SchemeError if this is not the
     case.
-
     >>> validate_form(read_line('(a b)'), 2)
     """
     if not scheme_listp(expr):
@@ -471,7 +481,6 @@ def validate_formals(formals):
     """Check that FORMALS is a valid parameter list, a Scheme list of symbols
     in which each symbol is distinct. Raise a SchemeError if the list of
     formals is not a list of symbols or if any symbol is repeated.
-
     >>> validate_formals(read_line('(a b c)'))
     """
     symbols = set()
